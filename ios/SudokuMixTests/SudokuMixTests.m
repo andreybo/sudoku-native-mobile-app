@@ -7,11 +7,11 @@
 #define TIMEOUT_SECONDS 600
 #define TEXT_TO_LOOK_FOR @"Welcome to React"
 
-@interface SudokuMixTests : XCTestCase
+@interface twoj.sudokuTests : XCTestCase
 
 @end
 
-@implementation SudokuMixTests
+@implementation twoj.sudokuTests
 
 - (BOOL)findSubviewInView:(UIView *)view matching:(BOOL (^)(UIView *view))test
 {

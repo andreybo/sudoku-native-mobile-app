@@ -1,3 +1,4 @@
+$FirebaseSDKVersion = '10.19.0'
 # Resolve react_native_pods.rb with node to allow for hoisting
 require Pod::Executable.execute_command('node', ['-p',
   'require.resolve(
@@ -23,9 +24,10 @@ linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil
   Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
   use_frameworks! :linkage => linkage.to_sym
+  use_frameworks! :linkage => :static
 end
 
-target 'SudokuMix' do
+target 'twoj.sudoku' do
   config = use_native_modules!
 
   use_react_native!(
@@ -39,7 +41,7 @@ target 'SudokuMix' do
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
 
-  target 'SudokuMixTests' do
+  target 'twoj.sudokuTests' do
     inherit! :complete
     # Pods for testing
   end

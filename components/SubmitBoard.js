@@ -30,9 +30,15 @@ export default class SubmitBoard extends Component {
                     </TouchableOpacity>
 
                     <View style={paddingStyle}>
-                    <TouchableOpacity style={buttonStyle} onPress={this.props.clearUserInputs}>
-                        <Text style={buttonText}>Clear</Text>
-                    </TouchableOpacity>
+                        <TouchableOpacity style={buttonStyle} onPress={this.props.clearUserInputs}>
+                            <Text style={buttonText}>Clear</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={paddingStyle}>
+                        <TouchableOpacity style={buttonStyle} onPress={this.props.reload}>
+                            <Text style={buttonText}>Reload</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </View>    

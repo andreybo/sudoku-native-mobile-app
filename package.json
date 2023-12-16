@@ -1,5 +1,5 @@
 {
-  "name": "SudokuMix",
+  "name": "twoj.sudoku",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -10,6 +10,8 @@
     "test": "jest"
   },
   "dependencies": {
+    "@react-native-firebase/analytics": "^18.7.3",
+    "@react-native-firebase/app": "^18.7.3",
     "@react-navigation/native": "^6.1.9",
     "@react-navigation/native-stack": "^6.9.17",
     "crypto-js": "^4.2.0",

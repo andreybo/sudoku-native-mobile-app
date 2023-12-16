@@ -1,4 +1,4 @@
-package com.sudokumix
+package com.twoj.sudoku
 
 import android.app.Application
 import com.facebook.react.PackageList

@@ -1,19 +1,34 @@
-import React from 'react';
+ import React, { useEffect } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, Image } from 'react-native';
+import analytics from '@react-native-firebase/analytics';
 
 const HomeScreen = ({ navigation }) => {
+  const ClassicGameStart = async () => {
+    await analytics().logEvent('game', {
+      id: 1,
+      item: 'classic',
+    });
+    navigation.navigate('Classic level', { gridSize: 3, diff: 0 })
+  }
+  const EggGameStart = async () => {
+    await analytics().logEvent('game', {
+      id: 2,
+      item: 'eggs',
+    });
+    navigation.navigate('Eggs', { gridSize: 3, diff: 0 })
+  }
   return (
     <View style={styles.screen}>
       <Image source={require('../assets/logo.png')} style={styles.logo}/>
       <TouchableOpacity
         style={styles.button}
-        onPress={() => navigation.navigate('Classic level', { gridSize: 3, diff: 0 })}
+        onPress={ClassicGameStart}
       >
           <Text style={styles.buttonText}>Classic game</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.button}
-        onPress={() => navigation.navigate('Eggs', { gridSize: 3, diff: 0 })}
+        onPress={EggGameStart}
       >
           <Text style={styles.buttonText}>Eggs</Text>
       </TouchableOpacity>

@@ -13,6 +13,7 @@ class Sudoku extends Component {
         const diff = this.props.diff;
         const initialBoard = this.initializeBoard(gridSize, diff);
         const game = this.props.game;
+        this.reloadView = this.reloadView.bind(this);
         this.state = {
             board: initialBoard,
             gridSize: gridSize,
@@ -22,6 +23,22 @@ class Sudoku extends Component {
             game: game,
             selectedColIndex: null,
         };
+    }
+
+    reloadView() {
+        const gridSize = this.props.gridSize;
+        const diff = this.props.diff;
+        const initialBoard = this.initializeBoard(gridSize, diff);
+    
+        this.setState({
+            board: initialBoard,
+            initialBoard: initialBoard,
+            selectedNumber: null,
+            selectedRowIndex: null,
+            selectedColIndex: null,
+        }, () => {
+            console.log('New state set:', this.state.board);
+        });
     }
     
     initializeBoard = (gridSize, diff) => {
@@ -337,7 +354,7 @@ class Sudoku extends Component {
                                 style={{ width: '90%', height: '90%' }}
                                 />
                             :
-                                <Text style={stylesBtn.textStyle}>{n + 1}{this.state.game}</Text>
+                                <Text style={stylesBtn.textStyle}>{n + 1}</Text>
                             }
                         </TouchableOpacity>
                     ))}
@@ -362,7 +379,8 @@ class Sudoku extends Component {
                 {!this.isBoardFull() && (
                     <SubmitBoard 
                         solve={this.solve} 
-                        valid={this.boardValid} 
+                        valid={this.boardValid}
+                        reload={this.reloadView}
                         clearUserInputs={this.clearUserInputs}
                     />
                 )}

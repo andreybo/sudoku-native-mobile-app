@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "606077844855",
+    "project_id": "sudoku-mix",
+    "storage_bucket": "sudoku-mix.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:606077844855:android:284f44ae7a98289a39b572",
+        "android_client_info": {
+          "package_name": "com.twoj.sudoku"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-jqv5twL64BOpFCELbmrW6jwY6E1XQ1M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

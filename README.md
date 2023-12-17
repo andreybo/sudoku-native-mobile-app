@@ -40,6 +40,7 @@ npm run ios
 
 # OR using Yarn
 yarn ios
+yarn ios --udid "8C034B93-DB54-4C31-A171-7F0FA9FC438E"
 ```
 
 If everything is set up _correctly_, you should see your new app running in your _Android Emulator_ or _iOS Simulator_ shortly provided you have set up your emulator/simulator correctly.

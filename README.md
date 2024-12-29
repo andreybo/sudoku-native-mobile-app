@@ -116,9 +116,6 @@ Before you begin, ensure you have met the following requirements:
    - Verify that the game runs smoothly on your device.
    - Test all features to ensure they function as expected.
 
-### 🖼️ Preview
-
-![Gameplay Screenshot](./path-to-your-gameplay-image.png)
 
 ---
 

@@ -33,7 +33,7 @@ Before you begin, ensure you have met the following requirements:
    Open your terminal or command prompt and run:
 
    ```bash
-   git clone https://github.com/yourusername/sudoku-native-mobile-app.git
+   git clone https://github.com/andreybo/sudoku-native-mobile-app
    ```
 
 2. **Navigate to the Project Directory**
@@ -104,7 +104,7 @@ Before you begin, ensure you have met the following requirements:
 
      # OR using Yarn
      yarn ios
-     yarn ios --udid "8C034B93-DB54-4C31-A171-7F0FA9FC438E"
+     yarn ios --udid "9C034B93-DB54-4C31-A171-7F0FA9FC438E"
      ```
 
    If everything is set up correctly, your new app should launch in your **Android Emulator** or **iOS Simulator** shortly. Ensure your emulator/simulator is properly configured.

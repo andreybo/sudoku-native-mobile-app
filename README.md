@@ -170,7 +170,12 @@ This project is licensed under the [MIT License](LICENSE).
 ## 📬 Contact
 
 - **Website:** [https://twoj.io/](https://twoj.io/)
-- **Email:** [your-email@example.com](mailto:your-email@example.com)
+- **Email:** [your-email@example.com](mailto:info@twoj.io)
+
+
+## Thank You for Your Support
+
+As an independent developer, your support means the world to me. Every piece of feedback, download, and kind word helps me continue creating unique projects like this one. Thank you for being a part of this journey and making it possible to bring my ideas to life.
 
 ---
 

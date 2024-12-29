@@ -1,80 +1,180 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
 
-# Getting Started
+# Sudoku Native Mobile App
 
->**Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.
+![Sudoku Native Mobile App Preview](./game.png)
 
-## Step 1: Start the Metro Server
+**Sudoku Native Mobile App** is a cutting-edge mobile application built with [**React Native**](https://reactnative.dev). It offers an immersive Sudoku experience, blending traditional puzzle-solving with modern mobile functionalities. Whether you're a Sudoku enthusiast or new to the game, this app provides an engaging and seamless experience across both Android and iOS platforms.
 
-First, you will need to start **Metro**, the JavaScript _bundler_ that ships _with_ React Native.
+## 📱 Download
 
-To start Metro, run the following command from the _root_ of your React Native project:
+- **[Google Play Store](https://play.google.com/store/apps/details?id=com.twoj.sudoku)**
+- **[Apple App Store](https://apps.apple.com/pl/app/sudoku-mix-quadoku/id6474512012)**
+- **[Official Website](https://twoj.io/)**
 
-```bash
-# using npm
-npm start
+## 🚀 Getting Started
 
-# OR using Yarn
-yarn start
-```
+Follow these steps to set up and run the Sudoku Native Mobile App project on your local machine for development and testing purposes.
 
-## Step 2: Start your Application
+### 🔧 Prerequisites
 
-Let Metro Bundler run in its _own_ terminal. Open a _new_ terminal from the _root_ of your React Native project. Run the following command to start your _Android_ or _iOS_ app:
+Before you begin, ensure you have met the following requirements:
 
-### For Android
+- **Operating System:** Windows, macOS, or Linux
+- **Development Tools:** [Node.js](https://nodejs.org/) (version X.X or higher)
+- **Package Manager:** [npm](https://www.npmjs.com/) or [Yarn](https://yarnpkg.com/)
+- **React Native CLI:** Install globally using `npm install -g react-native-cli`
+- **SDKs:** Android SDK and/or Xcode for iOS development
+- **Other Dependencies:** Ensure you have [Watchman](https://facebook.github.io/watchman/) installed (for macOS users)
 
-```bash
-# using npm
-npm run android
+### 📦 Installation
 
-# OR using Yarn
-yarn android
-```
+1. **Clone the Repository**
 
-### For iOS
+   Open your terminal or command prompt and run:
 
-```bash
-# using npm
-npm run ios
+   ```bash
+   git clone https://github.com/yourusername/sudoku-native-mobile-app.git
+   ```
 
-# OR using Yarn
-yarn ios
-yarn ios --udid "8C034B93-DB54-4C31-A171-7F0FA9FC438E"
-```
+2. **Navigate to the Project Directory**
 
-If everything is set up _correctly_, you should see your new app running in your _Android Emulator_ or _iOS Simulator_ shortly provided you have set up your emulator/simulator correctly.
+   ```bash
+   cd sudoku-native-mobile-app
+   ```
 
-This is one way to run your app — you can also run it directly from within Android Studio and Xcode respectively.
+3. **Install Dependencies**
 
-## Step 3: Modifying your App
+   Using npm:
 
-Now that you have successfully run the app, let's modify it.
+   ```bash
+   npm install
+   ```
 
-1. Open `App.tsx` in your text editor of choice and edit some lines.
-2. For **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Developer Menu** (<kbd>Ctrl</kbd> + <kbd>M</kbd> (on Window and Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (on macOS)) to see your changes!
+   Or using Yarn:
 
-   For **iOS**: Hit <kbd>Cmd ⌘</kbd> + <kbd>R</kbd> in your iOS Simulator to reload the app and see your changes!
+   ```bash
+   yarn install
+   ```
 
-## Congratulations! :tada:
+4. **Install Pods (iOS Only)**
+
+   If you're setting up for iOS, navigate to the `ios` directory and install pods:
+
+   ```bash
+   cd ios
+   pod install
+   cd ..
+   ```
+
+### 🏃 Running the Project
+
+1. **Start the Metro Server**
+
+   First, you need to start **Metro**, the JavaScript bundler that comes with React Native.
+
+   From the root of your React Native project, run:
+
+   ```bash
+   # Using npm
+   npm start
+
+   # OR using Yarn
+   yarn start
+   ```
+
+2. **Start Your Application**
+
+   With Metro Bundler running in its own terminal, open a new terminal window and navigate to the root of your React Native project. Then, run the following commands to start your **Android** or **iOS** app:
+
+   - **For Android**
+
+     ```bash
+     # Using npm
+     npm run android
+
+     # OR using Yarn
+     yarn android
+     ```
+
+   - **For iOS**
+
+     ```bash
+     # Using npm
+     npm run ios
+
+     # OR using Yarn
+     yarn ios
+     yarn ios --udid "8C034B93-DB54-4C31-A171-7F0FA9FC438E"
+     ```
+
+   If everything is set up correctly, your new app should launch in your **Android Emulator** or **iOS Simulator** shortly. Ensure your emulator/simulator is properly configured.
+
+   *Alternatively*, you can run the app directly from **Android Studio** or **Xcode** respectively.
+
+3. **Testing**
+
+   - Verify that the game runs smoothly on your device.
+   - Test all features to ensure they function as expected.
+
+### 🖼️ Preview
+
+![Gameplay Screenshot](./path-to-your-gameplay-image.png)
+
+---
+
+## 🎨 Modifying Your App
+
+Now that you've successfully run the app, let's make some modifications:
+
+1. **Edit `App.tsx`**
+
+   Open `App.tsx` in your preferred text editor and make your desired changes.
+
+2. **Reload the App to See Changes**
+
+   - **For Android:**
+     - Press the <kbd>R</kbd> key twice in the terminal.
+     - OR select **"Reload"** from the **Developer Menu** by pressing <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd</kbd> + <kbd>M</kbd> (macOS).
+
+   - **For iOS:**
+     - Press <kbd>Cmd</kbd> + <kbd>R</kbd> in the iOS Simulator.
+
+   Your changes should now be visible in the running app!
+
+## 🎉 Congratulations! :tada:
 
 You've successfully run and modified your React Native App. :partying_face:
 
-### Now what?
+### What's Next?
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [Introduction to React Native](https://reactnative.dev/docs/getting-started).
+- **Integrate with Existing Apps:** If you want to add this new React Native code to an existing application, check out the [Integration Guide](https://reactnative.dev/docs/integration-with-existing-apps).
+- **Learn More About React Native:** Dive deeper with the [Introduction to React Native](https://reactnative.dev/docs/getting-started).
 
-# Troubleshooting
+## 🛠️ Troubleshooting
 
-If you can't get this to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+If you encounter issues, refer to the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page for solutions.
 
-# Learn More
+## 📚 Learn More
 
-To learn more about React Native, take a look at the following resources:
+Enhance your knowledge of React Native with these resources:
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+- **[React Native Website](https://reactnative.dev):** Discover more about React Native.
+- **[Getting Started](https://reactnative.dev/docs/environment-setup):** Overview of React Native and environment setup.
+- **[Learn the Basics](https://reactnative.dev/docs/getting-started):** Guided tour of React Native basics.
+- **[Blog](https://reactnative.dev/blog):** Read the latest official React Native blog posts.
+- **[`@facebook/react-native`](https://github.com/facebook/react-native):** The open-source GitHub repository for React Native.
+
+---
+
+## 📝 License
+
+This project is licensed under the [MIT License](LICENSE).
+
+## 📬 Contact
+
+- **Website:** [https://twoj.io/](https://twoj.io/)
+- **Email:** [your-email@example.com](mailto:your-email@example.com)
+
+---
+
+*Happy Coding! 🚀*

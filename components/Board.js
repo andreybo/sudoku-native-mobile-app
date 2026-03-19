@@ -1,185 +1,239 @@
-import React, { Component } from 'react'
-import Square from './Square'
-import { View, Text, Dimensions } from 'react-native';
+import React, { useContext, useMemo } from 'react';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import Square from './Square';
+import { ThemeContext } from '../utils/ThemeContext';
 
+const SCREEN_PADDING = 26;
+const BOARD_BORDER = 3;
 
+const Board = ({
+  board,
+  initialBoard,
+  setSelectedCell,
+  gridSize,
+  game,
+  selectedRowIndex,
+  selectedColIndex,
+}) => {
+  const { theme } = useContext(ThemeContext);
+  const { width: screenWidth } = useWindowDimensions();
 
-export default class Board extends Component {
-    constructor(props) {
-        super(props);
-        const gridSize = this.props.gridSize;
-        const game = this.props.game;
+  const totalCells = gridSize * gridSize;
+  const availableWidth = Math.min(screenWidth - SCREEN_PADDING, 420);
+  const cellSize = Math.floor((availableWidth - BOARD_BORDER * 2) / totalCells);
+  const boardSize = cellSize * totalCells + BOARD_BORDER * 2;
+  const fontSize = Math.max(10, Math.min(22, Math.floor(cellSize * 0.54)));
 
-        this.state = {
-            selected_square_row: undefined,
-            selected_square_col_index: undefined,
-            selectedGrid: null,
-            selectedRowIndex: null,
-            selectedColIndex: null,
-            gridSize: gridSize,
-            game: game,
-        };
-    }
-
-    onPress = (rowIndex, colIndex) => {
-        this.setState({
-            selectedRowIndex: rowIndex,
-            selectedColIndex: colIndex,
-        });
-
-        // Новая строка: использование переданной функции для обработки нажатия на число
-        this.props.setSelectedCell(rowIndex, colIndex);
-    }
-    
-
-    handleNumberPress = (value) => {
-        // If the key entered is valid, we change the value of the square in the boards state.
-        if(this.state.selected_square_row !== undefined ){
-            this.props.changeValueOnBoard(
-                value, [this.state.selected_square_row, this.state.selected_square_col_index]
-                )
-        }
-    }
-
-    handleSquareClick = (gridIndex) => {
-        this.setState({ selectedGrid: gridIndex });
-    };
-
-    renderGrid = (grid, gridIndex) => {
-
-        const gridSize = this.state.gridSize;
-
-        const screenWidth = Dimensions.get('window').width;
-        const squareWidth = (screenWidth - 20) /gridSize;
-        const cellWidth = (squareWidth / gridSize) - 2;
-
-        const styles = {
-            grid: {
-                flexDirection: 'row',
-                flexWrap: 'wrap',
-                borderColor: 'red', // Darker border for the entire 3x3 grid
-                width: squareWidth,
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginBottom: 4,
-            },
-            gridSpecial: {
-                flexDirection: 'row',
-                flexWrap: 'wrap',
-                borderColor: 'red', // Darker border for the entire 3x3 grid
-                width: squareWidth,
-                backgroundColor: '#F9F9F9',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginBottom: 4,
-            },
-            cell: {
-                width: cellWidth,
-                height: cellWidth,
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderWidth: 1,
-                borderColor: '#F1F5F9',
-            },
-            selectedCell: {
-                width: cellWidth,
-                height: cellWidth,
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderWidth: 1,
-                borderColor: '#4EABF4',
-            },
-            cellGenerated: {
-                width: cellWidth,
-                height: cellWidth,
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderWidth: 1,
-                borderColor: '#DAE1E9',
-            },
-            specialCell:{
-                width: cellWidth,
-                height: cellWidth,
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderWidth: 1,
-                borderColor: '#ccc',
-                backgroundColor: '#F9F9F9',
-            },
-            row: {
-                flexDirection: 'row',
-            },
-            highlightedCell: {
-                width: cellWidth,
-                height: cellWidth,
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: '#FFFEEC',
-                borderWidth: 1,
-                borderColor: '#DAE1E9'
-            },
-        };
-
-        let gridStyle = (gridIndex % 2 === 0) ? styles.grid : styles.gridSpecial;
-    
-        return (
-                <View key={gridIndex} style={gridStyle}>
-                    {grid.map((cell, cellIndex) => {
-                        let rowIndex = Math.floor(gridIndex / gridSize) * gridSize + Math.floor(cellIndex / gridSize);
-                        let colIndex = (gridIndex % gridSize) * gridSize + cellIndex % gridSize;
-        
-                        // Determine the styling based on selection and axis highlighting
-                        let isCellSelected = this.state.selectedRowIndex === rowIndex && this.state.selectedColIndex === colIndex;
-                        let isSameRow = rowIndex === this.state.selectedRowIndex;
-                        let isSameCol = colIndex === this.state.selectedColIndex;
-                        let cellStyle = isCellSelected ? styles.selectedCell : (isSameRow || isSameCol) ? styles.highlightedCell : styles.cell;
-                        let cellStyleGenerated = isCellSelected ? styles.selectedCell : (isSameRow || isSameCol) ? styles.highlightedCell : styles.cellGenerated;
-                        const { value, isPreGenerated } = cell;
-
-                        return (
-                            <Square 
-                                key={`${gridIndex}-${cellIndex}`}
-                                value={cell !== 0 ? cell : ''}
-                                style={!isPreGenerated ? cellStyle : cellStyleGenerated}
-                                onPress={() => isPreGenerated ? null : this.onPress(rowIndex, colIndex)}
-                                isPreGenerated={isPreGenerated}
-                                size={gridSize > 3 ? 12 : 18}
-                                game={this.state.game}
-                            />
-                        );
-                    })}
-                </View>
+  // Static background layer: only changes when a new puzzle is generated.
+  // Uses initialBoard (stable during gameplay) so entering numbers never triggers a recalc here.
+  const cellBg = useMemo(() => {
+    const bgViews = [];
+    for (let r = 0; r < totalCells; r += 1) {
+      for (let c = 0; c < totalCells; c += 1) {
+        const isPreGen = (initialBoard[r]?.[c] ?? 0) !== 0;
+        bgViews.push(
+          <View
+            key={`bg-${r}-${c}`}
+            style={{
+              position: 'absolute',
+              top: r * cellSize,
+              left: c * cellSize,
+              width: cellSize,
+              height: cellSize,
+              backgroundColor: isPreGen
+                ? theme.generatedCellBackground
+                : theme.cellBackground,
+            }}
+          />,
         );
+      }
     }
-    
-    
-    
-    
-    
+    return (
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        {bgViews}
+      </View>
+    );
+  }, [initialBoard, cellSize, totalCells, theme.generatedCellBackground, theme.cellBackground]);
 
-    render() {
-        const { board, gridSize } = this.props;
-        const gridSizeScaled = gridSize * gridSize;
+  // Highlight overlay layer: only 4 absolute Views — only updates when selection changes.
+  // This is the key optimisation: tapping a cell costs ~4 native view updates instead of ~40.
+  const highlights = useMemo(() => {
+    if (selectedRowIndex === null || selectedColIndex === null) {
+      return null;
+    }
+    const blockRowStart = Math.floor(selectedRowIndex / gridSize) * gridSize;
+    const blockColStart = Math.floor(selectedColIndex / gridSize) * gridSize;
+    return (
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        {/* Same block */}
+        <View
+          style={{
+            position: 'absolute',
+            top: blockRowStart * cellSize,
+            left: blockColStart * cellSize,
+            width: gridSize * cellSize,
+            height: gridSize * cellSize,
+            backgroundColor: theme.highlightBackground,
+          }}
+        />
+        {/* Same row */}
+        <View
+          style={{
+            position: 'absolute',
+            top: selectedRowIndex * cellSize,
+            left: 0,
+            width: totalCells * cellSize,
+            height: cellSize,
+            backgroundColor: theme.primarySoft,
+          }}
+        />
+        {/* Same column */}
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: selectedColIndex * cellSize,
+            width: cellSize,
+            height: totalCells * cellSize,
+            backgroundColor: theme.primarySoft,
+          }}
+        />
+        {/* Selected cell */}
+        <View
+          style={{
+            position: 'absolute',
+            top: selectedRowIndex * cellSize + 1,
+            left: selectedColIndex * cellSize + 1,
+            width: cellSize - 2,
+            height: cellSize - 2,
+            backgroundColor: theme.secondarySoft,
+            borderWidth: 2,
+            borderRadius: 5,
+            borderColor: theme.selectedBorder,
+          }}
+        />
+      </View>
+    );
+  }, [
+    selectedRowIndex,
+    selectedColIndex,
+    cellSize,
+    gridSize,
+    totalCells,
+    theme.highlightBackground,
+    theme.primarySoft,
+    theme.secondarySoft,
+    theme.selectedBorder,
+  ]);
 
-        if (!Array.isArray(board)) {
-            return <Text>Loading board...</Text>;
-        }
-    
-        let grids = [];
-        for (let i = 0; i < gridSizeScaled; i++) {
-            let grid = [];
-            for (let j = 0; j < gridSizeScaled; j++) {
-                let rowIndex = Math.floor(i / gridSize) * gridSize + Math.floor(j / gridSize);
-                let colIndex = (i % gridSize) * gridSize + j % gridSize;
-                grid.push(board[rowIndex][colIndex]);
-            }
-            grids.push(this.renderGrid(grid, i));
-        }
-    
-        return (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                {grids}
-            </View>
+  // Cell content layer: only changes when board values or notes change.
+  // NO dependency on selectedRowIndex / selectedColIndex — tapping a cell does NOT
+  // trigger a cells recompute or any Square re-render.
+  const cells = useMemo(() => {
+    const renderedCells = [];
+
+    for (let rowIndex = 0; rowIndex < totalCells; rowIndex += 1) {
+      for (let colIndex = 0; colIndex < totalCells; colIndex += 1) {
+        const cellData = board[rowIndex]?.[colIndex] || {
+          value: null,
+          isPreGenerated: false,
+          notes: [],
+        };
+
+        renderedCells.push(
+          <View
+            key={`${rowIndex}-${colIndex}`}
+            style={[
+              styles.cellWrap,
+              {
+                width: cellSize,
+                height: cellSize,
+                borderRightWidth: colIndex === totalCells - 1 ? 0 : colIndex % gridSize === gridSize - 1 ? 2 : 1,
+                borderBottomWidth: rowIndex === totalCells - 1 ? 0 : rowIndex % gridSize === gridSize - 1 ? 2 : 1,
+                borderRightColor: colIndex % gridSize === gridSize - 1 ? theme.borderStrong : theme.border,
+                borderBottomColor: rowIndex % gridSize === gridSize - 1 ? theme.borderStrong : theme.border,
+              },
+            ]}
+          >
+            <Square
+              value={cellData.value}
+              onPress={setSelectedCell}
+              isPreGenerated={cellData.isPreGenerated}
+              size={fontSize}
+              game={game}
+              notes={cellData.notes}
+              rowIndex={rowIndex}
+              colIndex={colIndex}
+              gridScale={totalCells}
+              textColor={theme.text}
+              userTextColor={theme.primaryDark}
+              noteColor={theme.subText}
+            />
+          </View>,
         );
+      }
     }
-}
+
+    return renderedCells;
+  }, [
+    board,
+    cellSize,
+    fontSize,
+    game,
+    gridSize,
+    setSelectedCell,
+    theme.border,
+    theme.borderStrong,
+    theme.text,
+    theme.primaryDark,
+    theme.subText,
+    totalCells,
+  ]);
+
+  return (
+    <View
+      style={[
+        styles.board,
+        {
+          width: boardSize,
+          height: boardSize,
+          backgroundColor: theme.gridBackground,
+          borderColor: theme.borderStrong,
+          shadowColor: theme.shadow,
+        },
+      ]}
+    >
+      {/* Render order: cell backgrounds → highlights → cell content → glow */}
+      {cellBg}
+      {highlights}
+      {cells}
+      <View pointerEvents="none" style={[styles.boardGlow, { backgroundColor: theme.textureTint }]} />
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  board: {
+    borderRadius: 24,
+    borderWidth: BOARD_BORDER,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 7,
+  },
+  boardGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '22%',
+  },
+  cellWrap: {
+    overflow: 'hidden',
+  },
+});
+
+export default Board;

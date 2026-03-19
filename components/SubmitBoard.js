@@ -1,70 +1,39 @@
-import React, { Component } from 'react'
-import {View, TouchableOpacity,Text} from 'react-native'
-import Errors from "./Errors"
-import { Alert } from 'react-native';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
+import GameButton from './ui/GameButton';
 
-export default class SubmitBoard extends Component {
-    state = {
-        error:""
-    }
-    showWinningMessage = (message) => {
-        Alert.alert(message);
-    }
-    checkSolve = () =>{
-        if(this.props.valid()){
-            console.log("valid")
-            this.props.solve()
-            this.showWinningMessage("You good to go")
-        }else{
-            console.log("Not Valid")
-            this.showWinningMessage("Board Is Not Valid")
-        }
-    }
+const SubmitBoard = ({ onCheck, onClear, onReload }) => {
+  return (
+    <View style={styles.container}>
+      <GameButton
+        title="Clear"
+        subtitle="Reset your moves"
+        icon="⌫"
+        onPress={onClear}
+        variant="secondary"
+        style={styles.action}
+      />
+      <GameButton
+        title="New"
+        subtitle="Fresh board"
+        icon="↻"
+        onPress={onReload}
+        variant="accent"
+        style={styles.action}
+      />
+    </View>
+  );
+};
 
-    render() {
-        return (
-            <View>
-                <View style={buttonGroupStyle}>
-                    <TouchableOpacity onPress={this.checkSolve} style={buttonStyle}> 
-                        <Text style={buttonText}>Check</Text>
-                    </TouchableOpacity>
-
-                    <View style={paddingStyle}>
-                        <TouchableOpacity style={buttonStyle} onPress={this.props.clearUserInputs}>
-                            <Text style={buttonText}>Clear</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={paddingStyle}>
-                        <TouchableOpacity style={buttonStyle} onPress={this.props.reload}>
-                            <Text style={buttonText}>Reload</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </View>    
-        )
-    }
-}
-const buttonGroupStyle = {
-    flexDirection:'row',
-}
-const paddingStyle = {
-    paddingLeft:5
-}
-const buttonText = {
-    color: 'white',
-    fontSize: 16,
+const styles = StyleSheet.create({
+  container: {
     width: '100%',
-    textAlign: 'center',
-    fontSize: 20,
-}
-const buttonStyle = {
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: '#4EABF4',
-    paddingTop: 10,
-    paddingBottom: 10,
-    paddingLeft: 20,
-    paddingRight: 20,
-}
+    gap: 10,
+    marginTop: 18,
+  },
+  action: {
+    width: '100%',
+  },
+});
 
+export default SubmitBoard;

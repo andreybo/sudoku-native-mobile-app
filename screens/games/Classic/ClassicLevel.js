@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { View, TouchableOpacity, Button, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
 
 
 const ClassicLevel = ({ navigation }) => {
   const [step, setStep] = useState(1); // Step 1 for grid size, Step 2 for difficulty
   const [gridSize, setGridSize] = useState(null);
-  const [difficulty, setDifficulty] = useState(null);
+
 
   const [isLoading, setIsLoading] = useState(false);
-  
+
 
 
   const selectGridSize = (size) => {
@@ -18,8 +18,8 @@ const ClassicLevel = ({ navigation }) => {
 
   const selectDifficulty = (diff) => {
     setIsLoading(true); // Start loading animation
-    setDifficulty(diff);
-  
+
+
     // Simulate a delay or fetch data, then navigate
     setTimeout(() => {
       navigation.navigate('Classic game', { gridSize, diff });
@@ -65,19 +65,19 @@ const ClassicLevel = ({ navigation }) => {
             <Text style={styles.title}>Select Grid Size:</Text>
             <TouchableOpacity
               style={styles.button}
-              onPress={() => selectGridSize(2)} 
+              onPress={() => selectGridSize(2)}
             >
                 <Text style={styles.buttonText}>2x2 Grid</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.button}
-              onPress={() => selectGridSize(3)} 
+              onPress={() => selectGridSize(3)}
             >
                 <Text style={styles.buttonText}>3x3 Grid</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.button}
-              onPress={() => selectGridSize(4)} 
+              onPress={() => selectGridSize(4)}
             >
                 <Text style={styles.buttonText}>4x4 Grid</Text>
             </TouchableOpacity>
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
   },
   button: {
     borderRadius: 8,
@@ -121,11 +121,10 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: 'white',
-    fontSize: 16,
     width: '100%',
     textAlign: 'center',
     fontSize: 20,
-  }
+  },
 });
 
 export default ClassicLevel;

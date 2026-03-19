@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { View, TouchableOpacity, Button, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { getGameMode } from '../../../utils/gameModes';
 
+const MAX_GRID_SIZE = getGameMode('diamonds').maxGridSize ?? 3;
 
-const Eggs = ({ navigation }) => {
+const Diamonds = ({ navigation }) => {
   const [step, setStep] = useState(1); // Step 1 for grid size, Step 2 for difficulty
   const [gridSize, setGridSize] = useState(null);
-  const [difficulty, setDifficulty] = useState(null);
+
 
   const [isLoading, setIsLoading] = useState(false);
-  
+
 
 
   const selectGridSize = (size) => {
@@ -18,11 +20,11 @@ const Eggs = ({ navigation }) => {
 
   const selectDifficulty = (diff) => {
     setIsLoading(true); // Start loading animation
-    setDifficulty(diff);
-  
+
+
     // Simulate a delay or fetch data, then navigate
     setTimeout(() => {
-      navigation.navigate('Eggs game', { gridSize, diff });
+      navigation.navigate('Diamonds game', { gridSize, diff });
       setIsLoading(false); // Stop loading animation
     }, 2000); // Adjust the delay as needed
   };
@@ -63,18 +65,15 @@ const Eggs = ({ navigation }) => {
         {step === 1 && (
           <>
             <Text style={styles.title}>Select Grid Size:</Text>
-            <TouchableOpacity
-              style={styles.button}
-              onPress={() => selectGridSize(2)} 
-            >
-                <Text style={styles.buttonText}>2x2 Grid</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.button}
-              onPress={() => selectGridSize(3)} 
-            >
-                <Text style={styles.buttonText}>3x3 Grid</Text>
-            </TouchableOpacity>
+            {Array.from({ length: MAX_GRID_SIZE - 1 }, (_, i) => i + 2).map(size => (
+              <TouchableOpacity
+                key={size}
+                style={styles.button}
+                onPress={() => selectGridSize(size)}
+              >
+                <Text style={styles.buttonText}>{size}x{size} Grid</Text>
+              </TouchableOpacity>
+            ))}
           </>
         )}
 
@@ -99,7 +98,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
   },
   button: {
     borderRadius: 8,
@@ -115,11 +114,10 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: 'white',
-    fontSize: 16,
     width: '100%',
     textAlign: 'center',
     fontSize: 20,
-  }
+  },
 });
 
-export default Eggs;
+export default Diamonds;

@@ -1,417 +1,734 @@
-import React, { Component, useEffect } from 'react';
-import Board from "./Board";
-import SubmitBoard from "./SubmitBoard";
-import {View, Text, TouchableOpacity, Alert, Image} from 'react-native'
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Image, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
+import Board from './Board';
+import SubmitBoard from './SubmitBoard';
+import Errors from './Errors';
+import GameButton from './ui/GameButton';
+import { formatElapsedTime } from './ui/GameTimer';
+import PopupModal from './ui/PopupModal';
+import SudokuHeader from './sudoku/SudokuHeader';
+import SudokuKeypad from './sudoku/SudokuKeypad';
+import styles from './sudoku/styles';
+import { ThemeContext } from '../utils/ThemeContext';
+import soundManager from '../utils/SoundManager';
+import { getGameMode } from '../utils/gameModes';
+import {
+  checkBoardValid,
+  checkIsBoardFull,
+  initializeBoard,
+  isValid,
+} from '../utils/sudokuLogic';
+import { startGameStat, saveGameResult, markDailyCompleted } from '../utils/statsStorage';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 
+const hapticOptions = {
+  enableVibrateFallback: true,
+  ignoreAndroidSystemSettings: false,
+};
 
-class Sudoku extends Component {
-    constructor(props) {
-        super(props);
-        const gridSize = this.props.gridSize;
-        const diff = this.props.diff;
-        const initialBoard = this.initializeBoard(gridSize, diff);
-        const game = this.props.game;
-        this.reloadView = this.reloadView.bind(this);
-        this.state = {
-            board: initialBoard,
-            gridSize: gridSize,
-            initialBoard: initialBoard, // Make sure this line is included
-            selectedNumber: null,
-            selectedRowIndex: null,
-            game: game,
-            selectedColIndex: null,
-        };
+const DIFFICULTY_META = {
+  '-1': { label: 'Easy', icon: '+', helper: 'Relaxed pace' },
+  '0': { label: 'Normal', icon: '++', helper: 'Balanced run' },
+  '1': { label: 'Hard', icon: '+++', helper: 'Tough puzzle' },
+};
+
+const Sudoku = ({ gridSize, diff, game, isDaily = false }) => {
+  const { theme, hapticsEnabled, soundEnabled, hintsEnabled, setHintsEnabled } = useContext(ThemeContext);
+  const navigation = useNavigation();
+  const { width: screenWidth } = useWindowDimensions();
+  const gameMode = getGameMode(game);
+  const difficultyMeta = DIFFICULTY_META[String(diff)] || DIFFICULTY_META['0'];
+  const statusTimeoutRef = useRef(null);
+  const timerRef = useRef(null);
+  const gameWonRef = useRef(false);
+  const loadingAnim = useRef(new Animated.Value(0)).current;
+  const loadingLoopRef = useRef(null);
+  const loadingTimeoutRef = useRef(null);
+  const currentGameIdRef = useRef(null);
+
+  const [isLoading, setIsLoading] = useState(true);
+
+  const pickerGap = 8;
+  const pickerColumns = gridSize === 4 ? 6 : gridSize === 3 ? 5 : 3;
+  const btnSize = Math.max(
+    42,
+    Math.min(58, Math.floor((screenWidth - 34 - pickerGap * (pickerColumns - 1)) / pickerColumns)),
+  );
+  const btnFontSize = Math.max(14, Math.floor(btnSize * 0.36));
+
+  const [board, setBoard] = useState([]);
+  const [initialBoard, setInitialBoard] = useState([]);
+  const [selectedNumber, setSelectedNumber] = useState(null);
+  const [selectedRowIndex, setSelectedRowIndex] = useState(null);
+  const [selectedColIndex, setSelectedColIndex] = useState(null);
+  const [notes, setNotes] = useState({});
+  const [isNoteMode, setIsNoteMode] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  const [mistakes, setMistakes] = useState(0);
+  const [status, setStatus] = useState({ message: '', type: 'error' });
+  const [modalConfig, setModalConfig] = useState({ visible: false, actions: [] });
+  const [score, setScore] = useState(0);
+
+  const showStatus = useCallback((message, type = 'error') => {
+    clearTimeout(statusTimeoutRef.current);
+    setStatus({ message, type });
+    statusTimeoutRef.current = setTimeout(() => {
+      setStatus({ message: '', type: 'error' });
+    }, 2200);
+  }, []);
+
+  const closeModal = useCallback(() => {
+    setModalConfig(prev => ({ ...prev, visible: false }));
+  }, []);
+
+  // Start / stop the loading dot animation based on isLoading
+  useEffect(() => {
+    if (isLoading) {
+      loadingAnim.setValue(0);
+      loadingLoopRef.current = Animated.loop(
+        Animated.timing(loadingAnim, {
+          toValue: 1,
+          duration: 1100,
+          useNativeDriver: true,
+        }),
+      );
+      loadingLoopRef.current.start();
+    } else {
+      loadingLoopRef.current?.stop();
+    }
+  }, [isLoading, loadingAnim]);
+
+  const reloadView = useCallback(() => {
+    // Show loading screen immediately and reset all game state
+    setIsLoading(true);
+    setBoard([]);
+    setInitialBoard([]);
+    setSelectedNumber(null);
+    setSelectedRowIndex(null);
+    setSelectedColIndex(null);
+    setNotes({});
+    setIsNoteMode(false);
+    setStatus({ message: '', type: 'error' });
+    setModalConfig({ visible: false, actions: [] });
+    gameWonRef.current = false;
+    setSeconds(0);
+    clearInterval(timerRef.current);
+    clearTimeout(loadingTimeoutRef.current);
+
+    const loadStart = Date.now();
+
+    // Yield to the React renderer so the loading screen paints BEFORE
+    // initializeBoard() blocks the JS thread (critical for 16×16)
+    loadingTimeoutRef.current = setTimeout(() => {
+      let seed = null;
+      if (isDaily) {
+        const today = new Date();
+        seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+      }
+
+      const newInitialBoard = initializeBoard(gridSize, diff, seed);
+      const elapsed = Date.now() - loadStart;
+      const remaining = Math.max(0, 2000 - elapsed);
+      const newGameId = uuidv4();
+      currentGameIdRef.current = newGameId;
+      startGameStat({ gameModeId: game, difficulty: diff, gameId: newGameId });
+
+      // Enforce minimum 2-second loading time; waits longer if generation was slow
+      loadingTimeoutRef.current = setTimeout(() => {
+        setBoard(newInitialBoard.map(row => [...row]));
+        setInitialBoard(newInitialBoard.map(row => [...row]));
+        setMistakes(0);
+        setScore(0);
+        setIsLoading(false);
+        timerRef.current = setInterval(() => {
+          if (!gameWonRef.current) {
+            setSeconds(current => current + 1);
+          }
+        }, 1000);
+      }, remaining);
+    }, 50);
+  }, [diff, gridSize, isDaily]);
+
+  useEffect(() => {
+    reloadView();
+  }, [reloadView, game]);
+
+  useEffect(() => () => {
+    clearInterval(timerRef.current);
+    clearTimeout(statusTimeoutRef.current);
+    clearTimeout(loadingTimeoutRef.current);
+    loadingLoopRef.current?.stop();
+  }, []);
+
+  const setSelectedCell = useCallback((rowIndex, colIndex) => {
+    if (hapticsEnabled) {
+      ReactNativeHapticFeedback.trigger('selection', hapticOptions);
+    }
+    setSelectedRowIndex(rowIndex);
+    setSelectedColIndex(colIndex);
+  }, [hapticsEnabled]);
+
+  const { filledByUser, totalEmpty } = useMemo(() => {
+    let filled = 0;
+    let empty = 0;
+
+    for (let rowIndex = 0; rowIndex < board.length; rowIndex += 1) {
+      for (let colIndex = 0; colIndex < (board[rowIndex]?.length || 0); colIndex += 1) {
+        if (initialBoard[rowIndex]?.[colIndex] === 0) {
+          empty += 1;
+          if (board[rowIndex][colIndex] !== 0) {
+            filled += 1;
+          }
+        }
+      }
     }
 
-    reloadView() {
-        const gridSize = this.props.gridSize;
-        const diff = this.props.diff;
-        const initialBoard = this.initializeBoard(gridSize, diff);
-    
-        this.setState({
-            board: initialBoard,
-            initialBoard: initialBoard,
-            selectedNumber: null,
-            selectedRowIndex: null,
-            selectedColIndex: null,
-        }, () => {
-            console.log('New state set:', this.state.board);
+    return { filledByUser: filled, totalEmpty: empty };
+  }, [board, initialBoard]);
+
+  const progress = totalEmpty > 0 ? filledByUser / totalEmpty : 0;
+
+  const boardWithStatus = useMemo(
+    () => board.map((row, rowIndex) => row.map((cell, colIndex) => ({
+      value: cell > 0 ? cell : null,
+      isPreGenerated: initialBoard[rowIndex]?.[colIndex] !== 0,
+      notes: notes[`${rowIndex}-${colIndex}`] || [],
+    }))),
+    [board, initialBoard, notes],
+  );
+
+  const boardValid = useCallback(() => checkBoardValid(board, gridSize), [board, gridSize]);
+  const isBoardFull = useCallback(() => checkIsBoardFull(board, gridSize), [board, gridSize]);
+
+  const openCheckModal = useCallback(() => {
+    const valid = boardValid();
+    const full = isBoardFull();
+
+    if (valid) {
+      if (hapticsEnabled) {
+        ReactNativeHapticFeedback.trigger('notificationSuccess', hapticOptions);
+      }
+      
+      const actions = [
+        {
+          title: 'Keep Playing',
+          subtitle: 'Back to the board',
+          icon: '▶',
+          variant: 'primary',
+          onPress: closeModal,
+        },
+      ];
+      
+      if (!full && diff !== 1) {
+        actions.push({
+          title: hintsEnabled ? 'Hints: ON' : 'Hints: OFF',
+          subtitle: 'Toggle invalid move warnings',
+          icon: hintsEnabled ? '👁' : '🕶',
+          variant: 'secondary',
+          onPress: () => {
+            closeModal();
+            setHintsEnabled(!hintsEnabled);
+            showStatus(!hintsEnabled ? 'Live hints enabled' : 'Live hints disabled', 'success');
+          },
         });
-    }
-    
-    initializeBoard = (gridSize, diff) => {
-        let board = this.generateFullBoard(gridSize);
-        this.removeCells(board, gridSize, diff);
-        console.log('Initialized Board:', board);
-        return board;
+      }
+
+      setModalConfig({
+        visible: true,
+        icon: full ? '🏆' : '✨',
+        title: full ? 'Board Completed' : 'Board Looks Clean',
+        message: full
+          ? 'Everything is valid. Great finish.'
+          : 'No conflicts found in the current state. Keep pushing.',
+        chips: [
+          { label: 'Progress', value: `${Math.round(progress * 100)}%`, tone: 'accent' },
+          { label: 'Time', value: formatElapsedTime(seconds), tone: 'default' },
+        ],
+        actions,
+      });
+      showStatus('No conflicts found.', 'success');
+      return;
     }
 
-    generateFullBoard = (gridSize) => {
-        const gridSizeScale = gridSize * gridSize;
-        let board = Array.from({ length: gridSizeScale }, () => Array(gridSizeScale).fill(0));
-        this.fillBoard(board, 0, 0, gridSize);
-        return board;
+    if (hapticsEnabled) {
+      ReactNativeHapticFeedback.trigger('notificationError', hapticOptions);
     }
-
-    fillBoard = (board, row, col, gridSize) => {
-        const gridSizeScale = gridSize * gridSize;
-        if (row === gridSizeScale) return true;  // Base case for row
-        if (col === gridSizeScale) return this.fillBoard(board, row + 1, 0, gridSize);  // Move to next row
-    
-        const numbers = this.shuffleArray(Array.from({ length: gridSizeScale }, (_, index) => index + 1));
-        for (let num of numbers) {
-            if (this.isValid(board, row, col, num, gridSize)) {
-                board[row][col] = num;
-                if (this.fillBoard(board, row, col + 1, gridSize)) return true;
-                board[row][col] = 0;  // Backtrack
-            }
-        }
-        return false;  // Trigger backtracking
+    if (soundEnabled) {
+      soundManager.playError();
     }
-    
-
-    shuffleArray = (array) => {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-        return array;
-    }
-
-    removeCells = (board, gridSize, diff) => {
-        const gridSizeScale = gridSize * gridSize;
-        const gridScale = gridSize * gridSize * gridSize * gridSize;
-        let remainingCells = gridScale;
-        const cellsToRemove = Math.floor(Math.random() * 10) + (diff != 0 ? diff > 0 ? (Math.round(gridScale*0.7)) : (Math.round(gridScale*0.3)) : Math.round(gridScale*0.5)); // Adjust for difficulty
-
-        while (remainingCells > gridScale - cellsToRemove) {
-            let row = Math.floor(Math.random() * gridSizeScale);
-            let col = Math.floor(Math.random() * gridSizeScale);
-            if (board[row][col] !== 0) {
-                board[row][col] = 0;
-                remainingCells--;
-            }
-        }
-    }
-
-    isValid = (board, row, col, num, gridSize) => {
-        const gridSizeScale = gridSize * gridSize;
-        // Row and Column check
-        for (let i = 0; i < gridSizeScale; i++) {
-            if (board[row][i] === num || board[i][col] === num) return false;
-        }
-        // Subgrid check
-        const startRow = row - row % gridSize;
-        const startCol = col - col % gridSize;
-        for (let i = 0; i < gridSize; i++) {
-            for (let j = 0; j < gridSize; j++) {
-                if (board[startRow + i][startCol + j] === num) return false;
-            }
-        }
-        return true;
-    }
-    
-    
-    solve = () => {
-        const gridSize = this.state.gridSize;
-        const boardCopy = this.state.board.map(row => [...row]);
-        if (this.solveBoard(boardCopy, gridSize)) {
-            this.setState({ board: boardCopy });
-            return true;
-        }
-        return false;
-    }
-
-    solveBoard = (board, gridSize) => {
-        const gridSizeScale = gridSize * gridSize;
-        let stack = [{ board, row: 0, col: 0, num: 1 }];
-        
-        while (stack.length > 0) {
-            let { board, row, col, num } = stack.pop();
-    
-            // Find next empty cell and update row, col
-            const [nextRow, nextCol] = this.findBlank(board, gridSize);
-            row = nextRow;
-            col = nextCol;
-    
-            for (let n = num; n <= gridSizeScale; n++) {
-                if (this.isValid(board, row, col, n, gridSize)) {
-                    board[row][col] = n;
-                    stack.push({ board: [...board.map(row => [...row])], row, col, num: n + 1 });
-                    break;
+    const newActions = [];
+    if (diff !== 1) {
+      newActions.push({
+        title: 'Fix It',
+        subtitle: 'Highlight and clear one error',
+        icon: '↺',
+        variant: 'accent',
+        onPress: () => {
+          closeModal();
+          for (let r = 0; r < board.length; r++) {
+            for (let c = 0; c < (board[r]?.length || 0); c++) {
+              if (board[r][c] !== 0 && initialBoard[r]?.[c] === 0) {
+                const val = board[r][c];
+                const bCopy = board.map(row => [...row]);
+                bCopy[r][c] = 0;
+                if (!isValid(bCopy, r, c, val, gridSize)) {
+                  setSelectedCell(r, c);
+                  if (soundEnabled) {
+                    soundManager.playClick();
+                  }
+                  setBoard(bCopy);
+                  showStatus('Conflict removed', 'success');
+                  return;
                 }
+              }
             }
-    
-            // Check if the board is solved
-            if (row === (gridSizeScale - 1) && col === (gridSizeScale - 1)) {
-                return true;
-            }
+          }
+        },
+      });
+      newActions.push({
+        title: hintsEnabled ? 'Hints: ON' : 'Hints: OFF',
+        subtitle: 'Toggle invalid move warnings',
+        icon: hintsEnabled ? '👁' : '🕶',
+        variant: 'secondary',
+        onPress: () => {
+          closeModal();
+          setHintsEnabled(!hintsEnabled);
+          showStatus(!hintsEnabled ? 'Live hints enabled' : 'Live hints disabled', 'success');
+        },
+      });
+    } else {
+      newActions.push({
+        title: 'Close',
+        subtitle: 'Return to game',
+        icon: '✕',
+        variant: 'secondary',
+        onPress: closeModal,
+      });
+    }
+
+    setModalConfig({
+      visible: true,
+      icon: '⚠️',
+      title: 'Conflicts Detected',
+      message: diff === 1 ? 'Hints and auto-fixes are disabled in Hard mode.' : 'Some cells currently break sudoku rules.',
+      chips: [
+        { label: 'Progress', value: `${Math.round(progress * 100)}%`, tone: 'accent' },
+        { label: 'Tip', value: 'Check highlights', tone: 'default' },
+      ],
+      actions: newActions,
+    });
+    showStatus('There are mistakes on the board.', 'error');
+  }, [
+    board,
+    initialBoard,
+    gridSize,
+    boardValid,
+    closeModal,
+    hapticsEnabled,
+    isBoardFull,
+    progress,
+    seconds,
+    setSelectedCell,
+    showStatus,
+    soundEnabled,
+    diff,
+    hintsEnabled,
+    setHintsEnabled,
+  ]);
+
+  const clearUserInputs = useCallback(() => {
+    setBoard(initialBoard.map(row => [...row]));
+    setNotes({});
+    setSelectedNumber(null);
+    showStatus('All player moves cleared.', 'success');
+  }, [initialBoard, showStatus]);
+
+  const openClearModal = useCallback(() => {
+    setModalConfig({
+      visible: true,
+      icon: '🧹',
+      title: 'Clear Your Moves?',
+      message: 'Given cells stay locked. Your notes and entered values will be removed.',
+      actions: [
+        {
+          title: 'Cancel',
+          subtitle: 'Keep current board',
+          icon: '←',
+          variant: 'secondary',
+          onPress: closeModal,
+        },
+        {
+          title: 'Clear Now',
+          subtitle: 'Reset my moves',
+          icon: '⌫',
+          variant: 'accent',
+          onPress: () => {
+            closeModal();
+            clearUserInputs();
+          },
+        },
+      ],
+    });
+  }, [clearUserInputs, closeModal]);
+
+  const openReloadModal = useCallback(() => {
+    setModalConfig({
+      visible: true,
+      icon: '🎲',
+      title: 'Generate New Game?',
+      message: 'This starts a fresh board with the same mode, difficulty and grid size.',
+      actions: [
+        {
+          title: 'Stay Here',
+          subtitle: 'Keep this run',
+          icon: '↩',
+          variant: 'secondary',
+          onPress: closeModal,
+        },
+        {
+          title: 'New Game',
+          subtitle: 'Restart with same setup',
+          icon: '↻',
+          variant: 'primary',
+          onPress: () => {
+            closeModal();
+            reloadView();
+          },
+        },
+      ],
+    });
+  }, [closeModal, reloadView]);
+
+  const openWinModal = useCallback(() => {
+    const totalCellsCount = gridSize * gridSize;
+    gameWonRef.current = true;
+    clearInterval(timerRef.current);
+
+    // Calculate rebalanced score
+    const baseP = gridSize === 2 ? 10 : gridSize === 3 ? 50 : 250;
+    const diffM = diff === -1 ? 1 : diff === 0 ? 1.5 : 3;
+    const modeM = game === 'classic' ? 1 : game === 'diamonds' ? 1.2 : 1.1;
+
+    const currentBase = Math.round(baseP * diffM * modeM);
+    const expectedT = gridSize * gridSize * 150;
+
+    const mistakeP = mistakes * 10;
+    const timeFactor = Math.max(0, 1 - (seconds / (expectedT * 2)));
+    const timeBonus = Math.round(currentBase * 0.5 * timeFactor);
+    const perfectBonus = mistakes === 0 ? Math.round(currentBase * 0.5) : 0;
+    const speedBonus = seconds < expectedT ? Math.round(currentBase * 0.5) : 0;
+
+    const rawScore = currentBase + timeBonus + perfectBonus + speedBonus - mistakeP;
+    const finalScore = Math.max(Math.round(currentBase * 0.2), Math.round(rawScore));
+    setScore(finalScore);
+
+    // Save stats
+    saveGameResult({
+      gameModeId: game,
+      difficulty: diff,
+      time: seconds,
+      score: finalScore,
+      won: true,
+      gameId: currentGameIdRef.current
+    });
+
+    if (isDaily) {
+      const today = new Date();
+      const dateStr = today.toISOString().split('T')[0];
+      markDailyCompleted(dateStr);
+    }
+
+    if (hapticsEnabled) {
+      ReactNativeHapticFeedback.trigger('notificationSuccess', hapticOptions);
+    }
+    if (soundEnabled) {
+      soundManager.playSuccess();
+    }
+
+    setModalConfig({
+      visible: true,
+      icon: '👑',
+      title: 'Victory',
+      message: `You cleared the ${gameMode.name} ${totalCellsCount}x${totalCellsCount} board on ${difficultyMeta.label}.`,
+      chips: [
+        { label: 'Score', value: String(finalScore), tone: 'accent' },
+        { label: 'Time', value: formatElapsedTime(seconds), tone: 'default' },
+        { label: 'Mistakes', value: String(mistakes), tone: mistakes > 0 ? 'default' : 'accent' },
+      ],
+      actions: [
+        {
+          title: 'Play Again',
+          subtitle: 'New board, same setup',
+          icon: '↻',
+          variant: 'primary',
+          onPress: () => {
+            closeModal();
+            reloadView();
+          },
+        },
+        {
+          title: 'Menu',
+          icon: '⌂',
+          variant: 'secondary',
+          onPress: () => {
+            closeModal();
+            navigation.goBack();
+          },
+        },
+      ],
+    });
+    showStatus(`Puzzle solved in ${formatElapsedTime(seconds)}.`, 'success');
+  }, [
+    closeModal,
+    difficultyMeta.label,
+    gameMode.name,
+    gridSize,
+    hapticsEnabled,
+    navigation,
+    reloadView,
+    seconds,
+    showStatus,
+    soundEnabled,
+  ]);
+
+  const changeValueOnBoard = useCallback((value, rowIndex, colIndex) => {
+    const newBoard = board.map((row, currentRowIndex) => (
+      currentRowIndex === rowIndex
+        ? row.map((cell, currentColIndex) => (currentColIndex === colIndex ? value : cell))
+        : row
+    ));
+
+    setBoard(newBoard);
+    if (soundEnabled) {
+      soundManager.playClick();
+    }
+
+    if (checkIsBoardFull(newBoard, gridSize) && checkBoardValid(newBoard, gridSize)) {
+      openWinModal();
+    } else if (checkIsBoardFull(newBoard, gridSize)) {
+      if (hapticsEnabled) {
+        ReactNativeHapticFeedback.trigger('notificationError', hapticOptions);
+      }
+      if (soundEnabled) {
+        soundManager.playError();
+      }
+      showStatus('Board is full, but there are conflicts.', 'error');
+    }
+  }, [board, gridSize, hapticsEnabled, openWinModal, showStatus, soundEnabled]);
+
+  const handleNumberPress = useCallback((numberValue) => {
+    if (selectedRowIndex === null || selectedColIndex === null) {
+      showStatus('Select a cell first.', 'error');
+      return;
+    }
+
+    if (hapticsEnabled) {
+      ReactNativeHapticFeedback.trigger('impactLight', hapticOptions);
+    }
+
+    if (initialBoard[selectedRowIndex]?.[selectedColIndex] !== 0) {
+      if (hapticsEnabled) {
+        ReactNativeHapticFeedback.trigger('notificationWarning', hapticOptions);
+      }
+      showStatus('This cell is locked.', 'error');
+      return;
+    }
+
+    setSelectedNumber(numberValue);
+    const key = `${selectedRowIndex}-${selectedColIndex}`;
+
+    if (isNoteMode && numberValue !== null) {
+      const existingNotes = notes[key] || [];
+      const nextNotes = existingNotes.includes(numberValue)
+        ? existingNotes.filter(entry => entry !== numberValue)
+        : [...existingNotes, numberValue].sort((a, b) => a - b);
+      setNotes({
+        ...notes,
+        [key]: nextNotes,
+      });
+      return;
+    }
+
+    const nextValue = numberValue === null ? 0 : numberValue;
+
+    // Optional: Check if the value is correct immediately if we want to track "mistakes"
+    // For now, let's just track if it's valid in the current context
+    if (nextValue !== 0) {
+      const isVal = isValid(board, selectedRowIndex, selectedColIndex, nextValue, gridSize);
+      if (!isVal) {
+        setMistakes(m => m + 1);
+        if (hintsEnabled && diff !== 1) {
+          if (soundEnabled) soundManager.playError();
+          showStatus('Invalid move!', 'error');
         }
-    
-        return false; // No solution found
+      }
     }
 
-    findBlank = (board, gridSize) => {
-        const gridSizeScale = gridSize * gridSize;
-        for (let i = 0; i < gridSizeScale; i++) {
-            for (let a = 0; a < gridSizeScale; a++) {
-                if (board[i][a] === 0) { 
-                    return [i, a];
-                }
-            }
-        }
-        return null; // No blank cells
+    changeValueOnBoard(nextValue, selectedRowIndex, selectedColIndex);
+
+    if (nextValue !== 0) {
+      const updatedNotes = { ...notes };
+      delete updatedNotes[key];
+      setNotes(updatedNotes);
     }
+  }, [
+    changeValueOnBoard,
+    hapticsEnabled,
+    initialBoard,
+    isNoteMode,
+    notes,
+    selectedColIndex,
+    selectedRowIndex,
+    showStatus,
+    hintsEnabled,
+    diff,
+  ]);
 
-    boardValid = () => {
-        const { gridSize, board } = this.state;
-        const gridSizeScale = gridSize * gridSize;
-    
-        for (let row = 0; row < gridSizeScale; row++) {
-            for (let col = 0; col < gridSizeScale; col++) {
-                const cellValue = board[row][col];
-                if (cellValue !== 0) {
-                    board[row][col] = 0;
-                    const isValidCell = this.isValid(board, row, col, cellValue, gridSize);
-                    board[row][col] = cellValue;
-                    if (!isValidCell) {
-                        return false;
-                    }
-                }
-            }
-        }
-        return true;
-    }
+  const totalCells = gridSize * gridSize;
 
-    isBoardFull = () => {
-        const { gridSize, board } = this.state;
-        const gridSizeScale = gridSize * gridSize;
-    
-        for (let row = 0; row < gridSizeScale; row++) {
-            for (let col = 0; col < gridSizeScale; col++) {
-                if (board[row][col] === 0) {
-                    return false;  // Found an empty cell
-                }
-            }
-        }
-        return true;  // No empty cells found
-    }
-    
-    
-    
-    
-    changeBoard = (n, index) => {
-        this.setState(prevState => {
-            const newBoard = [...prevState.board];
-            newBoard[index[0]][index[1]] = n;
-            return { board: newBoard };
-        });
-    }
+  if (isLoading) {
+    const iconScale = loadingAnim.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [0.86, 1.12, 0.86],
+    });
+    const dot1Opacity = loadingAnim.interpolate({
+      inputRange: [0, 0.16, 0.45, 1],
+      outputRange: [0.22, 1, 0.22, 0.22],
+    });
+    const dot2Opacity = loadingAnim.interpolate({
+      inputRange: [0, 0.33, 0.62, 1],
+      outputRange: [0.22, 0.22, 1, 0.22],
+    });
+    const dot3Opacity = loadingAnim.interpolate({
+      inputRange: [0, 0.55, 0.78, 1],
+      outputRange: [0.22, 0.22, 1, 0.22],
+    });
 
-    changeValueOnBoard = (value, rowIndex, colIndex) => {
-        this.setState(prevState => {
-            const newBoard = prevState.board.map((row, rIndex) => 
-                rIndex === rowIndex ? row.map((cell, cIndex) => 
-                    cIndex === colIndex ? value : cell) : row
-            );
-            return { board: newBoard };
-        }, () => {
-            // After state update, check if the board is fully filled
-            if (this.isBoardFull()) {
-                // If the board is full, then check if it's valid
-                if (this.boardValid()) {
-                    this.showWinningMessage("You Win!");
-                } else {
-                    this.showWinningMessage("You Lose.");
-                }
-            }
-        });
-    }
-    
+    return (
+      <View style={[styles.screen, styles.loadingScreen, { backgroundColor: theme.background }]}>
+        <View style={[styles.loadingCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <Animated.View style={{ transform: [{ scale: iconScale }] }}>
+            {gameMode.images ? (
+              <Image 
+                source={gameMode.images[1]} 
+                style={{ width: 68, height: 68, marginBottom: 18 }} 
+                resizeMode="contain" 
+              />
+            ) : (
+              <Text style={styles.loadingIcon}>
+                {gameMode.icon}
+              </Text>
+            )}
+          </Animated.View>
+          <Text style={[styles.loadingTitle, { color: theme.text }]}>{gameMode.name}</Text>
+          <Text style={[styles.loadingSubtitle, { color: theme.subText }]}>
+            {totalCells}×{totalCells} · {difficultyMeta.label}
+          </Text>
+          <View style={styles.loadingDots}>
+            <Animated.View style={[styles.loadingDot, { backgroundColor: theme.primary, opacity: dot1Opacity }]} />
+            <Animated.View style={[styles.loadingDot, { backgroundColor: theme.primary, opacity: dot2Opacity }]} />
+            <Animated.View style={[styles.loadingDot, { backgroundColor: theme.primary, opacity: dot3Opacity }]} />
+          </View>
+        </View>
+      </View>
+    );
+  }
 
-    showWinningMessage = (message) => {
-        Alert.alert(message);
-    }
+  // Live rebalanced score calculation
+  const baseP = gridSize === 2 ? 10 : gridSize === 3 ? 50 : 250;
+  const diffM = diff === -1 ? 1 : diff === 0 ? 1.5 : 3;
+  const modeM = game === 'classic' ? 1 : game === 'diamonds' ? 1.2 : 1.1;
+  const currentBase = Math.round(baseP * diffM * modeM);
+  const expectedT = gridSize * gridSize * 150;
+  const timeFactor = Math.max(0, 1 - (seconds / (expectedT * 2)));
+  const timeBonus = Math.round(currentBase * 0.5 * timeFactor);
+  const perfectBonus = mistakes === 0 ? Math.round(currentBase * 0.5) : 0;
+  const speedBonus = seconds < expectedT ? Math.round(currentBase * 0.5) : 0;
+  const liveScore = Math.max(Math.round(currentBase * 0.2), Math.round(currentBase + timeBonus + perfectBonus + speedBonus - (mistakes * 10)));
 
-    clear = () => {
-        const { gridSize } = this.state;
-        this.setState({
-            board: Array.from({ length: gridSize }, () => Array.from({ length: gridSize }, () => 0))
-        });
-    }
+  return (
+    <View style={[styles.screen, { backgroundColor: theme.background }]}>
 
-    clearUserInputs = () => {
-        this.setState({
-            board: this.state.initialBoard.map(row => [...row])
-        });
-    }
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <SudokuHeader
+          theme={theme}
+          navigation={navigation}
+          difficultyMeta={difficultyMeta}
+          totalCells={totalCells}
+          seconds={seconds}
+          progress={progress}
+          score={liveScore}
+        />
 
-    handleNumberPress = (n) => {
-        const { selectedRowIndex, selectedColIndex } = this.state;
-        if (selectedRowIndex !== null && selectedColIndex !== null) {
-            const valueToDelete = n === null ? 0 : n; // Если n равно null, используйте 0 или другое значение, указывающее на пустую ячейку
-            this.changeValueOnBoard(valueToDelete, selectedRowIndex, selectedColIndex);
-        }
-    }
-    setSelectedCell = (rowIndex, colIndex) => {
-        this.setState({
-            selectedRowIndex: rowIndex,
-            selectedColIndex: colIndex,
-        });
-    }
-    
+        <View style={styles.boardWrap}>
+          <Board
+            board={boardWithStatus}
+            initialBoard={initialBoard}
+            setSelectedCell={setSelectedCell}
+            gridSize={gridSize}
+            game={game}
+            selectedRowIndex={selectedRowIndex}
+            selectedColIndex={selectedColIndex}
+          />
+        </View>
 
-    renderGrid = () => {
-        const { board, initialBoard } = this.state;
-        const { gridSize } = this.state;
-    
-        // Создаем новый массив с дополнительной информацией
-        const boardWithStatus = board.map((row, rowIndex) =>
-            row.map((cell, colIndex) => ({
-                value: cell > 0 ? cell : null,
-                isPreGenerated: initialBoard[rowIndex][colIndex] !== 0
-            }))
-        );
-        return (
-            <View style={styles.gridInner}>
-                <Board
-                    board={boardWithStatus}
-                    changeValueOnBoard={this.changeValueOnBoard}
-                    selectedNumber={this.state.selectedNumber}
-                    setSelectedCell={this.setSelectedCell}
-                    gridSize={gridSize}
-                    game={this.state.game}
-                />
-            </View>
-        );
-    }
+        <SudokuKeypad
+          theme={theme}
+          gameMode={gameMode}
+          totalCells={totalCells}
+          pickerGap={pickerGap}
+          btnSize={btnSize}
+          btnFontSize={btnFontSize}
+          isNoteMode={isNoteMode}
+          setIsNoteMode={setIsNoteMode}
+          hapticsEnabled={hapticsEnabled}
+          hapticOptions={hapticOptions}
+          selectedNumber={selectedNumber}
+          onNumberPress={handleNumberPress}
+        />
 
-    renderNumberSelectionRow = () => {
-        const { gridSize } = this.state;
-        const gridScale = gridSize * gridSize;
-        
+        <View style={styles.utilityRow}>
+          <GameButton
+            title={isNoteMode ? 'Notes On' : 'Notes Off'}
+            icon="✎"
+            variant={isNoteMode ? 'accent' : 'secondary'}
+            onPress={() => setIsNoteMode(current => !current)}
+            style={styles.utilityButton}
+          />
+          <GameButton
+            title="Hint Check"
+            icon="👁"
+            variant="secondary"
+            onPress={openCheckModal}
+            style={styles.utilityButton}
+            showBadge={!hintsEnabled && diff !== 1}
+            badgeColor={theme.primary}
+          />
+        </View>
 
-        const stylesBtn = {
-            centerNumbers: {
-                justifyContent: "center",
-                alignItems: "center"
-            },
+        <SubmitBoard onCheck={openCheckModal} onClear={openClearModal} onReload={openReloadModal} />
+      </ScrollView>
 
-            btnNumber: {
-                width: gridSize > 3 ? 40 : 50,
-                aspectRatio: 1,
-                backgroundColor: "#ECF6FF",
-                justifyContent: "center",
-                alignItems: "center",
-                borderRadius: 8,
-            },
-
-            numberRow: {
-                marginBottom: 20,
-                marginTop: 20,
-                flexDirection: 'row',
-                flexWrap: 'wrap',
-                gap: 15,
-                justifyContent: "center",
-                alignItems: "center",
-                paddingLeft: 10,
-                paddingRight: 10,
-            },
-        
-            textStyle: {
-                fontSize: 21,
-                color: "#4EABF4",
-            },
-        };
-
-        const images = {
-            0: require('../assets/games/eggs/d0.png'),
-            1: require('../assets/games/eggs/d1.png'),
-            2: require('../assets/games/eggs/d2.png'),
-            3: require('../assets/games/eggs/d3.png'),
-            4: require('../assets/games/eggs/d4.png'),
-            5: require('../assets/games/eggs/d5.png'),
-            6: require('../assets/games/eggs/d6.png'),
-            7: require('../assets/games/eggs/d7.png'),
-            8: require('../assets/games/eggs/d8.png'),
-            9: require('../assets/games/eggs/d9.png'),
-          };
-
-        return (
-            <View style={stylesBtn.centerNumbers}>
-                <View style={stylesBtn.numberRow}>
-                    {[...Array(gridScale).keys()].map(n => (
-                        <TouchableOpacity
-                            key={uuidv4()}
-                            style={stylesBtn.btnNumber}
-                            onPress={() => this.handleNumberPress(n + 1)}
-                        >
-                            { this.state.game === 'eggs' && images[n + 1] ? 
-                                <Image 
-                                source={images[n + 1]}
-                                style={{ width: '90%', height: '90%' }}
-                                />
-                            :
-                                <Text style={stylesBtn.textStyle}>{n + 1}</Text>
-                            }
-                        </TouchableOpacity>
-                    ))}
-                    <TouchableOpacity
-                        key={uuidv4()}
-                        style={stylesBtn.btnNumber}
-                        onPress={() => this.handleNumberPress(null)} // Или используйте 0 в зависимости от логики обработки
-                    >
-                        <Text style={stylesBtn.textStyle}>X</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        );
-    }
-    
-
-    render() {
-        return (
-            <View style={styles.boardPos}>
-                {this.renderGrid()}
-                {this.renderNumberSelectionRow()}
-                {!this.isBoardFull() && (
-                    <SubmitBoard 
-                        solve={this.solve} 
-                        valid={this.boardValid}
-                        reload={this.reloadView}
-                        clearUserInputs={this.clearUserInputs}
-                    />
-                )}
-            </View>
-        );
-    }
-}
-
-const styles = {
-    boardPos: {
-        justifyContent: "center",
-        alignItems: "center",
-        flexDirection:'column',
-        flexWrap:'wrap',
-        backgroundColor: "#fff",
-        height: '100%',
-    },
-    gridInner:{
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: "center",
-        alignItems: "center",
-        width: '100%',
-    },
-    rowStyle:{
-        flexDirection: 'row',
-    },
-    centerNumbers:{
-        justifyContent: "center",
-        alignItems: "center",
-    },
+      <PopupModal
+        visible={modalConfig.visible}
+        icon={modalConfig.icon}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        chips={modalConfig.chips}
+        actions={modalConfig.actions || []}
+        onDismiss={closeModal}
+      />
+      <Errors error={status.message} type={status.type} />
+    </View>
+  );
 };
 
 export default Sudoku;

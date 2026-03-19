@@ -4,15 +4,14 @@ import Sudoku from '../../../components/Sudoku';
 import { useRoute } from '@react-navigation/native';
 import { ThemeContext } from '../../../utils/ThemeContext';
 
-const ClassicGameScreen = () => {
+const DiamondsGameScreen = () => {
   const route = useRoute();
   const { theme } = useContext(ThemeContext);
-  const gridSize = route.params?.gridSize || 3;
-  const diff = route.params?.diff || 0;
+  const { gridSize = 3, diff = 0, isDaily = false } = route.params ?? {};
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <Sudoku gridSize={gridSize} diff={diff} game="classic" />
+        <Sudoku gridSize={gridSize} diff={diff} game="diamonds" isDaily={isDaily}/>
     </View>
   );
 };
@@ -28,4 +27,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ClassicGameScreen;
+export default DiamondsGameScreen;
